@@ -10,7 +10,8 @@
 
 struct r {
 	int source_x, source_y, source_w, source_h, // Describe a rectangle on the sprite sheet, what part of it to draw
-	dest_x, dest_y; // Describe a location on the screen on which to draw that sprite
+	dest_x, dest_y, // Describe a location on the screen on which to draw that sprite
+	dest_w, dest_h; // Allow enlarging or stretching the sprite, set to 0 to keep original size.
 	bool visible, flip_horizontal, flip_vertical;
 };
 

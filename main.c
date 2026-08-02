@@ -20,7 +20,7 @@ int main(void) {
 	// (If theres more than 100 at once it would probably glitch or something, but you'll never need that many)
 	int rslen = 0; // How many need to be rendered currently
 	
-	const char* sprite_sheet = "resource/gameveri_sheet_0720.png";
+	const char* sprite_sheet = "resource/gameveri_sheet_0801.png";
 	si_start(sprite_sheet);
 	
 	int state = MAIN_MENU;//MAIN_GAME;

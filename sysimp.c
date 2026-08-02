@@ -25,7 +25,7 @@ void si_start(const char* sprite_sheet)
 	
 	SetConfigFlags(FLAG_WINDOW_RESIZABLE); //Set before InitWindow
 	
-    InitWindow(screenDefWidth, screenDefHeight, "Averi game prototype 2026-07-20");
+    InitWindow(screenDefWidth, screenDefHeight, "Averi game prototype 2026-08-01");
 	
     spriteTexture = LoadTexture(sprite_sheet); //global Texture2D from LoadTexture("path to .png")
 	
@@ -86,25 +86,35 @@ void si_draw(struct r* rs, int rslen)
 		
 		DrawRectangle(disp_x, disp_y, scale_factor * ideal_w, scale_factor * ideal_h, GetColor(0x90EE90ff)); // Display area (mint green)
 		
-		// Draw the floor (Hard-coded here for now...)
-		int floor_y = 350;
-		DrawRectangleV(
-			(Vector2){ 0+disp_x, floor_y*scale_factor+disp_y }, // Top-left corner coordinates
-			(Vector2){ ideal_w*scale_factor, (ideal_h-floor_y)*scale_factor }, // Rectangle dimensions
-			GRAY);
-		
 		// Draw each r from the sprite sheet
 		for (int ri = 0; ri < rslen; ri++) {
-			if (rs[ri].visible)
-				DrawTexturePro(
-					spriteTexture, // Texture2D: what to draw
-					// Rectangle on the Texture2D, what part of it to draw:
-					(Rectangle){rs[ri].source_x, rs[ri].source_y, (rs[ri].flip_horizontal ? -rs[ri].source_w : rs[ri].source_w), rs[ri].source_h},
-					// Rectangle on the screen: where to draw it
-					(Rectangle){ rs[ri].dest_x*scale_factor + disp_x, rs[ri].dest_y*scale_factor + disp_y, rs[ri].source_w*scale_factor, rs[ri].source_h*scale_factor },
-					(Vector2){0,0}, 0.0f, WHITE // SNCA
-					);
+			if (rs[ri].visible) {
+					int dw, dh; // If .dest_ dimension isn't 0, use it, otherwise draw the sprite at its original size
+					if (rs[ri].dest_w) dw = rs[ri].dest_w; else dw = rs[ri].source_w;
+					if (rs[ri].dest_h) dh = rs[ri].dest_h; else dh = rs[ri].source_h;
+					DrawTexturePro(
+						spriteTexture, // Texture2D: what to draw
+						// Rectangle on the Texture2D, what part of it to draw:
+						(Rectangle){rs[ri].source_x, rs[ri].source_y, (rs[ri].flip_horizontal ? -rs[ri].source_w : rs[ri].source_w), (rs[ri].flip_vertical ? -rs[ri].source_h : rs[ri].source_h)},
+						// Rectangle on the screen: where to draw it
+						(Rectangle){ rs[ri].dest_x*scale_factor + disp_x, rs[ri].dest_y*scale_factor + disp_y,
+							dw*scale_factor, dh*scale_factor },
+						(Vector2){0,0}, 0.0f, WHITE // SNCA
+						);
+				}
 			}
+		
+		// Draw blinds so you can't see objects appearing & disappearing past the edges of the display area
+		Color blind_color = GetColor(0x052c46ff);
+		if (disp_y) {
+			int bh = disp_y; // Blind height
+			DrawRectangle(0, 0, si_get_width(), bh, blind_color);
+			DrawRectangle(0, si_get_height()-bh, si_get_width(), bh, blind_color);
+		} else {
+			int bw = disp_x; // Blind width
+			DrawRectangle(0, 0, bw, si_get_height(), blind_color);
+			DrawRectangle(si_get_width()-bw, 0, bw, si_get_height(), blind_color);
+		}
 
     EndDrawing();
     
