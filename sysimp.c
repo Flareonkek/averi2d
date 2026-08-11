@@ -25,7 +25,7 @@ void si_start(const char* sprite_sheet)
 	
 	SetConfigFlags(FLAG_WINDOW_RESIZABLE); //Set before InitWindow
 	
-    InitWindow(screenDefWidth, screenDefHeight, "Averi game prototype 2026-08-01");
+    InitWindow(screenDefWidth, screenDefHeight, "Averi game prototype 2026-08-11");
 	
     spriteTexture = LoadTexture(sprite_sheet); //global Texture2D from LoadTexture("path to .png")
 	
