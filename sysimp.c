@@ -38,7 +38,7 @@ int si_isRunning(void) {
 }
 
 // Get Keyboard inputs ----------------------------------------------------------------------
-int si_keys(bool* keyWa, bool* keyAa, bool* keySa, bool* keyDa, bool* keySpacea)
+int si_keys(bool* keyWa, bool* keyAa, bool* keySa, bool* keyDa, bool* keySpacea, bool* keyGa)
 {
 	int r = 0;
 	if (IsKeyDown(KEY_W)) *keyWa = 1; else *keyWa = 0;
@@ -46,6 +46,8 @@ int si_keys(bool* keyWa, bool* keyAa, bool* keySa, bool* keyDa, bool* keySpacea)
 	if (IsKeyDown(KEY_S)) *keySa = 1; else *keySa = 0;
 	if (IsKeyDown(KEY_D)) *keyDa = 1; else *keyDa = 0;
 	if (IsKeyDown(KEY_SPACE)) *keySpacea = 1; else *keySpacea = 0;
+	
+	if (IsKeyDown(KEY_G)) *keyGa = 1; else *keyGa = 0;
 }
 
 int si_get_width(void) {
