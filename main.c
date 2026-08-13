@@ -17,8 +17,8 @@ int main(void) {
 	bool keySpace = 0;
 	bool keyG = 0;
 	
-	struct r rs[100]; // Array of struct r (things to render on screen)
-	// (If theres more than 100 at once it would probably glitch or something, but you'll never need that many)
+	struct r rs[1000]; // Array of struct r (things to render on screen)
+	// (If theres more than 1000 at once it would probably glitch or something, but you'll never need that many)
 	int rslen = 0; // How many need to be rendered currently
 	
 	const char* sprite_sheet = "resource/gameveri_sheet_0810.png";
