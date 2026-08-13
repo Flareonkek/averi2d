@@ -35,7 +35,7 @@ static int camera_shift_y = 0;
 static const int cam_shift_spd = 2;
 
 // Collision rectangles data in immediate area
-static struct coll_rect crs[100];
+static struct coll_rect crs[1000];
 static int crlen = 0;
 
 //------------------------------------------------------------------------------------------------------------------------------------------
