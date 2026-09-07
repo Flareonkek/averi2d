@@ -1,0 +1,55 @@
+# [Feature 0] Ground ( Located at (0, 350), tile type 3 )
+A.0.350.3.
+1800R 100R 1800R 100R.
+
+# Wave
+A.1000.100.0.
+60R 60L 84R 24R 120R 72L 24R 12R.
+
+# Block
+A.650.-200.1.
+200R 400R 200R 400R.
+
+# Spool
+A.260.50.2.
+160R 20R 20L 20L 20R 20R 160R 20R 20L 20L 20R 20R.
+
+# Pinwheel
+A.1000.-400.4.
+180R 120L 60L 120R 60R
+180R 120L 60L 120R 60R
+180R 120L 60L 120R 60R
+180R 120L 60L 120R 60R.
+
+# Square
+A.1400.0.5.
+60R 60R 60R 60R.
+
+# [Feature 6] Upper area made of another ground shape and two squares
+A.1500.-400.6.
+1800R 100R 1800R 100R.
+
+A.1700.-699.7.
+60R 60R 60R 60R.
+
+A.2450.-699.8.
+60R 60R 60R 60R.
+
+# New stuff, because I need a much bigger map to actually load any different segments
+
+# [Feature 9] A big big block
+A.3500.-500.3.
+5000R 500R 5000R 500R.
+
+# Bigger pinwheel
+A.6000.-1100.2.
+300R 200L 100L 200R 100R
+300R 200L 100L 200R 100R
+300R 200L 100L 200R 100R
+300R 200L 100L 200R 100R.
+
+# A floating box next to the big pinwheel
+A.6650.-900.3.
+100R 200R 100R 200R.
+
+

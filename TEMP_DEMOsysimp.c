@@ -6,7 +6,6 @@
 // File-scope variables
 //------------------------------------------------------------------------------------
 
-// Window starting dimensions (It can get resized at any time though)
 const int screenDefWidth = 1800; // ideal: 1800
 const int screenDefHeight = 720; // ideal: 720
 float scale_factor = 1.0;
@@ -26,7 +25,7 @@ void si_start(const char* sprite_sheet)
 	
 	SetConfigFlags(FLAG_WINDOW_RESIZABLE); //Set before InitWindow
 	
-    InitWindow(screenDefWidth, screenDefHeight, "Averi game prototype 2026-09-06");
+    InitWindow(screenDefWidth, screenDefHeight, "Averi game special loading demonstration, 2026-09-06");
 	
     spriteTexture = LoadTexture(sprite_sheet); //global Texture2D from LoadTexture("path to .png")
 	
@@ -83,6 +82,14 @@ void si_draw(struct r* rs, int rslen)
 		disp_y = 0;
 	}
 	
+	// ########################### DEMO MODIFICATIONS ###########################
+	
+	disp_x += si_get_width() / 4;
+	disp_y += si_get_height() / 4;
+	scale_factor /= 2.0;
+	
+	// ##########################################################################
+	
     BeginDrawing();
     
         ClearBackground(GetColor(0x052c46ff)); // (dark blue)
@@ -106,7 +113,7 @@ void si_draw(struct r* rs, int rslen)
 						);
 				}
 			}
-		
+		/* ########################### DEMO COMMENTING ###########################
 		// Draw blinds so you can't see objects appearing & disappearing past the edges of the display area
 		Color blind_color = GetColor(0x052c46ff);
 		if (disp_y) {
@@ -118,7 +125,7 @@ void si_draw(struct r* rs, int rslen)
 			DrawRectangle(0, 0, bw, si_get_height(), blind_color);
 			DrawRectangle(si_get_width()-bw, 0, bw, si_get_height(), blind_color);
 		}
-
+		*/
     EndDrawing();
     
     /* Was using earlier to troubleshoot, uncomment if needed again...
