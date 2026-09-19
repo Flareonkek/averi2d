@@ -1,18 +1,16 @@
+
 #include "raylib.h"
-#include "render.h"
-#include <stdio.h>
 
 //------------------------------------------------------------------------------------
 // File-scope variables
 //------------------------------------------------------------------------------------
 
+// Window starting dimensions (It can get resized at any time though)
 const int screenDefWidth = 1800; // ideal: 1800
 const int screenDefHeight = 720; // ideal: 720
 float scale_factor = 1.0;
 int disp_x, disp_y; // Top-left corner of display area on window. disp_x may be negative to even up the cut-off area between the sides
 Texture2D spriteTexture;
-
-//int dpt = 0; // Was using this earlier to figure out issues. 'Debug Print Timer'
 
 //------------------------------------------------------------------------------------------------------------------------------------------
 // System implementation (Raylib) functions, prefix si_
@@ -20,12 +18,13 @@ Texture2D spriteTexture;
 
 
 // Initialize window and stuff --------------------------------------------------------------
-void si_start(const char* sprite_sheet)
-{
+void si_start(const char* sprite_sheet) {
 	
 	SetConfigFlags(FLAG_WINDOW_RESIZABLE); //Set before InitWindow
 	
-    InitWindow(screenDefWidth, screenDefHeight, "Averi game special loading demonstration, 2026-09-06");
+    InitWindow(screenDefWidth, screenDefHeight, "Averi game prototype 2026-09-17");
+    
+	//SetExitKey(KEY_NULL); // Disable the default escape-key closing the window action
 	
     spriteTexture = LoadTexture(sprite_sheet); //global Texture2D from LoadTexture("path to .png")
 	
@@ -38,16 +37,26 @@ int si_isRunning(void) {
 }
 
 // Get Keyboard inputs ----------------------------------------------------------------------
-int si_keys(bool* keyWa, bool* keyAa, bool* keySa, bool* keyDa, bool* keySpacea, bool* keyGa)
-{
-	int r = 0;
-	if (IsKeyDown(KEY_W)) *keyWa = 1; else *keyWa = 0;
-	if (IsKeyDown(KEY_A)) *keyAa = 1; else *keyAa = 0;
-	if (IsKeyDown(KEY_S)) *keySa = 1; else *keySa = 0;
-	if (IsKeyDown(KEY_D)) *keyDa = 1; else *keyDa = 0;
-	if (IsKeyDown(KEY_SPACE)) *keySpacea = 1; else *keySpacea = 0;
-	
-	if (IsKeyDown(KEY_G)) *keyGa = 1; else *keyGa = 0;
+int si_keys(void) {
+	// Use each bit of the 16-bit unsigned short to represent a key
+	unsigned short sum = 0;
+	if (IsKeyDown(KEY_W)) sum += k_powers_of_2[0];
+	if (IsKeyDown(KEY_A)) sum += k_powers_of_2[1];
+	if (IsKeyDown(KEY_S)) sum += k_powers_of_2[2];
+	if (IsKeyDown(KEY_D)) sum += k_powers_of_2[3];
+	if (IsKeyDown(KEY_G)) sum += k_powers_of_2[4];
+	if (IsKeyDown(KEY_SPACE)) sum += k_powers_of_2[5];
+	if (IsKeyDown(KEY_UP)) sum += k_powers_of_2[6];
+	if (IsKeyDown(KEY_LEFT)) sum += k_powers_of_2[7];
+	if (IsKeyDown(KEY_DOWN)) sum += k_powers_of_2[8];
+	if (IsKeyDown(KEY_RIGHT)) sum += k_powers_of_2[9];
+	if (IsKeyDown(KEY_LEFT_SHIFT) || IsKeyDown(KEY_RIGHT_SHIFT)) sum += k_powers_of_2[10];
+	if (IsKeyDown(KEY_LEFT_CONTROL) || IsKeyDown(KEY_RIGHT_CONTROL)) sum += k_powers_of_2[11];
+	if (IsKeyDown(KEY_BACKSPACE) || IsKeyDown(KEY_DELETE)) sum += k_powers_of_2[12];
+	if (IsKeyDown(KEY_TAB)) sum += k_powers_of_2[13];
+	if (IsKeyDown(KEY_ESCAPE)) sum += k_powers_of_2[14];
+	if (IsKeyDown(KEY_F6)) sum += k_powers_of_2[15];
+	return sum;
 }
 
 int si_get_width(void) {
@@ -63,7 +72,6 @@ int si_get_height(void) {
 //------------------------------------------------------------------------------------------------------------------------------------------
 void si_draw(struct r* rs, int rslen)
 {
-	
 	// ADJUST DISPLAY AREA in case window is resized
 	if (si_get_width() / si_get_height() > max_aspect_ratio) {
 		// If the screen is now wider than max_aspect_ratio: scale by height, shift display right to be centered in the window
@@ -82,13 +90,11 @@ void si_draw(struct r* rs, int rslen)
 		disp_y = 0;
 	}
 	
-	// ########################### DEMO MODIFICATIONS ###########################
-	
+	// ################ TEMP_DEMO changes ################
 	disp_x += si_get_width() / 4;
 	disp_y += si_get_height() / 4;
 	scale_factor /= 2.0;
-	
-	// ##########################################################################
+	// ###################################################
 	
     BeginDrawing();
     
@@ -98,7 +104,7 @@ void si_draw(struct r* rs, int rslen)
 		
 		// Draw each r from the sprite sheet
 		for (int ri = 0; ri < rslen; ri++) {
-			if (rs[ri].visible) {
+			if (true) {
 					int dw, dh; // If .dest_ dimension isn't 0, use it, otherwise draw the sprite at its original size
 					if (rs[ri].dest_w) dw = rs[ri].dest_w; else dw = rs[ri].source_w;
 					if (rs[ri].dest_h) dh = rs[ri].dest_h; else dh = rs[ri].source_h;
@@ -111,9 +117,9 @@ void si_draw(struct r* rs, int rslen)
 							dw*scale_factor, dh*scale_factor },
 						(Vector2){0,0}, 0.0f, WHITE // SNCA
 						);
-				}
 			}
-		/* ########################### DEMO COMMENTING ###########################
+		}
+		/* ############### TEMP_DEMO commenting ###############
 		// Draw blinds so you can't see objects appearing & disappearing past the edges of the display area
 		Color blind_color = GetColor(0x052c46ff);
 		if (disp_y) {
@@ -126,14 +132,9 @@ void si_draw(struct r* rs, int rslen)
 			DrawRectangle(si_get_width()-bw, 0, bw, si_get_height(), blind_color);
 		}
 		*/
+		//DrawFPS(0, 0); // For testing purposes, show the FPS in the corner (Raylib function)
+
     EndDrawing();
-    
-    /* Was using earlier to troubleshoot, uncomment if needed again...
-    if (dpt >= 120) {
-		dpt = 0;
-		printf("scale_factor %f, disp_x %d, disp_y %d, si_get_width() %d, si_get_height() %d\n", scale_factor, disp_x, disp_y, si_get_width(), si_get_height());
-	} else dpt++;
-	*/
 }
 
 // Just shut it down -------------------------------------------------------------------------

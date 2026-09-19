@@ -1,18 +1,17 @@
 
-#include "render.h"
-
 //------------------------------------------------------------------------------------------------------------------------------------------
 // FILE-SCOPE DATA
 //------------------------------------------------------------------------------------------------------------------------------------------
 
 // Player character data
+int averiX = 900; // Her X location (at her center)
+int averiY = 260; // Her Y location (top of her head)
+const int averiW = 28; // It's actually half her width, her X is the center of her sprite and its 28 pixels to either side.
+const int averiH = 90; // Her full height, her Y is at the top of her sprite.
+
 static bool averi_airborne = 0;
 static int averi_climbing = 0;
-static const int averiW = 28; // It's actually half her width, her X is the center of her sprite and its 28 pixels to either side.
-static const int averiH = 90; // Her full height, her Y is at the top of her sprite.
-static int averiX = 900; // Her X location
 static int averiVx = 0; // Her X-axis velocity
-static int averiY = 260;
 static int averiVy = 0;
 static const int runspd_max = 15;
 static int averiState = 0; // Which sprite to draw for animation
@@ -21,9 +20,8 @@ static bool tailSwing = 0; // Remember which way it was swinging last time it wa
 static bool averiRightFace = 0;
 static const int avg_stride = 8; // How many pixels of travel each frame represents
 static int animDX = 0; // X-travel since last walk/run frame change (So animations look right at any speed)
-
-// Key hold flags
-bool space_held = 1; // (Starts off 1 because the player would've pressed space to start the game)
+static int averiCounterV = 0; // How much velocity is to be counteracted when turning around (Used for animation smoothness)
+static bool averiCounter_hold = false; // Used in conjunction with above
 
 //------------------------------------------------------------------------------------------------------------------------------------------
 // HELPER FUNCTIONS for this file
@@ -105,111 +103,128 @@ bool averiVxyColl(struct coll_rect cr) {
 //------------------------------------------------------------------------------------------------------------------------------------------
 // Averi's physics and animations
 //------------------------------------------------------------------------------------------------------------------------------------------
-static void averi_tick(bool keyW, bool keyA, bool keyS, bool keyD, bool keySpace, struct coll_rect* crs, int* crlen, int frameNo) {
+static void averi_tick(unsigned short k, unsigned short k_held, struct coll_rect* crs, int* crlen) {
+	
+	extern int frameNo;
 	
 	if (averi_climbing) {
 		// averi_climbing of 1 means she's hanging on a ledge, 0 means she isn't.
 		// Values greater than 1 mean she's progressing through steps of pulling herself up and jumping over the ledge
+		struct coll_rect jump_from_ledge_cr = {averiX-averiW, averiY-50, averiW*2, averiH};
 		if (averi_climbing > 1) {
 			averi_climbing++;
 			if (averi_climbing == 5)
-				averiY -= 12; // Going into averiState 22
+				averiY -= 12; // Going into averiState 26
 			else if (averi_climbing == 7)
-				averiY -= 11; // Going into state 23
+				averiY -= 11; // Going into state 27
 			else if (averi_climbing == 9)
-				averiY -= 10; // Going into state 24
+				averiY -= 10; // Going into state 28
 			else if (averi_climbing == 11)
-				averiY -= 9; // Going into state 25
+				averiY -= 9; // Going into state 29
 			else if (averi_climbing == 13) {
-				averiY -= 8; // Going into normal airborne fall
-				averiVy = -16;
+				averiY -= 8; // Going into normal aerial state
+				averiVy = -16; // Rising with slightly less velocity than a normal jump
 				averi_climbing = 0;
 				averi_airborne = 1;
 			}
-		} else if (keyW || (keySpace && !space_held)) {
+		} else if ( // While hanging (averi_climbing == 1), player can press Space or W to jump up...
+			( (keyWdown(k) && !keyWdown(k_held))||(keySPACEdown(k) && !keySPACEdown(k_held)) ) && !any_collides(jump_from_ledge_cr, crs, *crlen) ) {
 			averi_climbing = 2;
-			averiY -= 13; // Going into state 21
-		} else if (keyS)
-			averi_climbing = 0; // Let go
+			averiY -= 13; // Going into state 25
+		} else if (keySdown(k)) // ...or S to let go of the ledge
+			averi_climbing = 0;
 	} else {
-		// Influence Averi's velocity according to keyboard input ---------------------------------------------------------------
-		if (keyA && !keyD) {
+		// Influence Averi's velocity according to keyboard input ---------------------------------------------------------------------
+		if (keyAdown(k) && !keyDdown(k)) {
 			// Try to accelerate left (on 2 out of every 3 frames)
 			if (averiVx > -runspd_max && frameNo % 3)
 				averiVx -= 1;
 			averiRightFace = 0;
 		}
-		else if (keyD && !keyA) {
+		else if (keyDdown(k) && !keyAdown(k)) {
 			// Try to accelerate right (on 2/3 frames)
 			if (averiVx < runspd_max && frameNo % 3)
 				averiVx += 1;
 			averiRightFace = 1;
 		}
-		else if ((frameNo % 3)) averiVx = approach_zero(averiVx, 1); // Slow down cause not trying to go anywhere
+		else if ((frameNo % 3)) averiVx = approach_zero(averiVx, 1); // Slow down cause we're not trying to go anywhere
 		
 		if (averi_airborne) // If in the air, enact gravity
-			averiVy += (keySpace? 1: 3); // (3x faster if space isn't being held)
-		else if (keySpace && !space_held) // Otherwise, jumping is possible
+			averiVy += (keySPACEdown(k)? 1: 3); // (3x faster if space is released)
+		else if (keySPACEdown(k) && !keySPACEdown(k_held)) // Otherwise, jumping is possible
 			averiVy = -20;
 		
-		// Apply velocity -------------------------------------------------------------------------------------------------------
+		// Apply velocity -------------------------------------------------------------------------------------------------------------
 		
 		// Collision check with every cr
 		for (int i = 0; i < *crlen; i++) {
 			struct coll_rect cr = crs[i]; // For each collision rectangle,
-			if (averiVxyColl(cr)) { // If Averi is on course to collide with it...
-				if (averiVxColl(cr)) {
-					if (averiVyColl(cr)) { // (Either axes velocity would cause a collision)
-						// Go as many twentieths of the intended course as possible without clipping into the corner and halt velocity
-						int oldVx = averiVx, oldVy = averiVy;
-						int vicesimi = 20;
-						while (averiVxyColl(cr) && vicesimi > 0) {
-							vicesimi--;
-							averiVx = (oldVx*vicesimi)/20;
-							averiVy = (oldVy*vicesimi)/20;
-						}
-						averiX += averiVx;
-						averiY += averiVy;
-						averiVx = averiVy = 0; // Halt both axes velocity
-					}
-					else { // (Only her x-axis velocity would cause a collision on its own)
-						// Place her right up against the wall/surface and halt Vx
-						if (averiVx > 0) averiX = cr.x-averiW;
-						else if (averiVx < 0) averiX = cr.x+cr.w+averiW;
-						// LEDGE GRAB CHECK
-						if ( (averiY+averiH > cr.y) && (cr.y > averiY) && (averi_airborne) ) {
-							averiVy = 0;
-							averi_climbing = 1;
-							averiY = cr.y - 27;
-							// Prevent a funny graphical glitch
-							if (averiVx > 0) averiRightFace = 1;
-							else averiRightFace = 0;
-						}
-						averiVx = 0;
-					}
+			if (averiVyColl(cr)) { // If Averi's Y velocity would result in collision:
+				// Reduce Vy accordingly
+				if (averiVy > 0) {
+					int potential_new_vy = cr.y - (averiY+averiH);
+					if (potential_new_vy < averiVy)
+						averiVy = potential_new_vy;
+				} else if (averiVy < 0) {
+					int potential_new_vy = (cr.y+cr.h) - averiY;
+					if (potential_new_vy > averiVy)
+						averiVy = potential_new_vy;
 				}
-				else { // (Only her y-axis velocity would cause a collision on its own)
-					// Place her right atop the floor or up against the ceiling and halt Vy
-					if (averiVy > 0)
-						averiY = cr.y-averiH;
-					else if (averiVy < 0) averiY = cr.y+cr.h;
+			}
+			if (averiVxyColl(cr)) { // If, after accounting for Y alone, her remaining velocity would result in collision:
+				// Reduce Vx accordingly
+				if (averiVx > 0) {
+					int potential_new_vx = cr.x - (averiX+averiW);
+					if (potential_new_vx < averiVx)
+						averiVx = potential_new_vx;
+				} else if (averiVx < 0) {
+					int potential_new_vx = (cr.x+cr.w) - (averiX-averiW);
+					if (potential_new_vx > averiVx)
+						averiVx = potential_new_vx;
+				}
+				
+				// LEDGE GRAB CHECK
+				struct coll_rect ledge_cr = {averiX-averiW, cr.y-27, averiW*2, averiH};
+				if ( (cr.y>averiY) && // The ledge is below the top of averi's head
+					 averi_airborne &&
+					 (averiVy >= 0) && // She's not still going up (since that may suffice to clear the obstacle without a grab, and the grab then would annoy the player)
+					 !any_collides(ledge_cr, crs, *crlen)
+					 && !keySdown(k) )
+				{
+					// Ensure she's facing properly for the ledge grab state
+					averiRightFace = (cr.x > averiX);
+					// Enter the ledge grab state
 					averiVy = 0;
+					averi_climbing = 1;
+					averiY = cr.y - 27;
+					averiX += averiVx;
+					averiVx = 0;
 				}
 			}
 		}
+		
+		/*
+		// If she's still in collision after all the velocity reductions by collision checks (i.e. stuck inside a solid object)...
+		struct coll_rect averi_cr = { .x=averiX-averiW, .y=averiY, .w=averiW*2, .h=averiH };
+		while (any_collides(averi_cr, crs, *crlen)) {
+			averiY--;
+			averi_cr = (struct coll_rect) { .x=averiX-averiW, .y=averiY, .w=averiW*2, .h=averiH };
+			averiVx = averiVy = 0;
+		}
+		*/
 		
 		// Enact velocity onto position
 		averiX += averiVx;
 		animDX += averiVx;
 		averiY += averiVy; // Fall
 		
-		// Unless we find her to be standing on something, assume she's in the air
-		averi_airborne = 1;
+		// Determine if she's airborne or standing on a precipice
+		averi_airborne = true; // Unless we find her to be standing on something, assume she's in the air
 		for (int i = 0; i < *crlen; i++) { // Now check every collision rectangle...
 			struct coll_rect cr = crs[i];
 			if (averiY+averiH == cr.y && ((averiX-averiW < cr.x+cr.w) && (averiX+averiW > cr.x)) ) {
 				// If she's standing on any cr, then she isn't in the air
-				averi_airborne = 0;
+				averi_airborne = false;
 				// If she's standing still, and sticking out over the edge, and there's room down on the side, go into a ledge hang there
 				if (!averiVx) {
 					struct coll_rect hang_right_cr = {(cr.x+cr.w), cr.y-27, averiW*2, averiH};
@@ -233,33 +248,64 @@ static void averi_tick(bool keyW, bool keyA, bool keyS, bool keyD, bool keySpace
 		}
 	}
 	
-	// Averi animations -----------------------------------------------------------------------------------------------------
+	// Averi animations ---------------------------------------------------------------------------------------------------------------
 	
 	if (averi_climbing) {
 		// Ledge hanging/climbing animations --------------------------------------------------------------------------------
-		if (averi_climbing < 2) averiState = 20;
-		else if (averi_climbing < 5) averiState = 21;
-		else if (averi_climbing < 7) averiState = 22;
-		else if (averi_climbing < 9) averiState = 23;
-		else if (averi_climbing < 11) averiState = 24;
-		else averiState = 25;
+		if (averi_climbing < 2) averiState = 24;
+		else if (averi_climbing < 5) averiState = 25;
+		else if (averi_climbing < 7) averiState = 26;
+		else if (averi_climbing < 9) averiState = 27;
+		else if (averi_climbing < 11) averiState = 28;
+		else averiState = 29;
 	} else if (averi_airborne) {
 		// Jumping/falling animations ---------------------------------------------------------------------------------------
-		if (averiVy < -2)
-			averiState = 16; // Rising
-		else if (averiVy < 2)
-			averiState = 17; // Peak
-		else if (averiVy < 6)
-			averiState = 18; // Descent
-		else
-			averiState = 19; // Fast descent
-	}
-	else if ((averiRightFace && averiVx < 0) || (!averiRightFace && averiVx > 0)) {
-		// Sliding and turning around ---------------------------------------------------------------------------------------
+		if ((averiRightFace && averiVx < 0) || (!averiRightFace && averiVx > 0)) {
+			// (Turning around in midair)
+			if (!averiCounter_hold) // When you first begin a turnaround, set averiCounterV
+				averiCounterV = abs(averiVx);
+			// During the turnaround, animation goes by fraction of averiCounterV decelerated under
+			if (abs(averiVx) < averiCounterV/4)
+				averiState = 19;
+			else if (abs(averiVx) < averiCounterV*2/4)
+				averiState = 18;
+			else if (abs(averiVx) < averiCounterV*3/4)
+				averiState = 17;
+			else //(abs(averiVx) < averiCounterV*4/4)
+				averiState = 16;
+		} else {
+			// (Not turning around in midair)
+			if (averiVy < -2)
+				averiState = 20; // Rising
+			else if (averiVy < 2)
+				averiState = 21; // Peak
+			else if (averiVy < 6)
+				averiState = 22; // Descent
+			else
+				averiState = 23; // Fast descent
+		}
+	} else if ((averiRightFace && averiVx < 0) || (!averiRightFace && averiVx > 0)) {
+		// Sliding and turning around on the ground -------------------------------------------------------------------------
+		if (!averiCounter_hold) // When you first begin a turnaround, set averiCounterV
+			averiCounterV = abs(averiVx);
+		// During the turnaround, animation goes by fraction of averiCounterV decelerated under
+		if (abs(averiVx) < averiCounterV/5)
+			averiState = 15;
+		else if (abs(averiVx) < averiCounterV*2/5)
+			averiState = 14;
+		else if (abs(averiVx) < averiCounterV*3/5)
+			averiState = 13;
+		else if (abs(averiVx) < averiCounterV*4/5)
+			averiState = 12;
+		else //(abs(averiVx) < averiCounterV*5/5)
+			averiState = 11;
+		
+		/* (Before, I had it just advance one animation frame every 3 ticks, but that didnt look as good at all speeds)
 		if (averiState < 11 || averiState > 15)
 			averiState = 11;
 		else if (averiState != 15 && !(frameNo % 3))
 			averiState += 1;
+		*/
 		// When you're about to have slid to a halt...
 		if (averiVx == 1 || averiVx == -1) {
 			averiVx = (averiVx == 1? -1 : 1); // Skip over 0-velocity (Or she would snap into stand-still frame)
@@ -297,8 +343,7 @@ static void averi_tick(bool keyW, bool keyA, bool keyS, bool keyD, bool keySpace
 			tailSwing = !tailSwing; // Switch direction when tail reaches the end of its swing
 	}
 	
-	// Key hold checks ------------------------------------------------------------------------------------------------------
-	
-	if (keySpace) space_held = 1;
-	else space_held = 0;
+	// Hold checks (must be done last, after all logic that uses them) ------------------------------------------------------
+
+	averiCounter_hold = (averiRightFace && averiVx < 0) || (!averiRightFace && averiVx > 0);
 }

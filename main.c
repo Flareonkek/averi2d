@@ -1,6 +1,5 @@
-#include <stdio.h>
-#include <stdbool.h>
-#include "render.h"
+
+#include "common.h"
 #include "sysimp.c"
 //#include "TEMP_DEMOsysimp.c" // JUST TO SHOW OFF LOADING
 #include "menu.c"
@@ -10,30 +9,18 @@
 // The MAIN FUNCTION
 //------------------------------------------------------------------------------------------------------------------------------------------
 
-int test_main(void) {
-	struct level* mylevel = load_level("testlevel.txt");
-	printdemo_level(mylevel);
-	unload_level(mylevel);
-	return 0;
-}
-
 int main(void) {
 	
-	bool keyW = 0;
-	bool keyA = 0;
-	bool keyS = 0;
-	bool keyD = 0;
-	bool keySpace = 0;
-	bool keyG = 0;
+	unsigned short kd = 0; // Which keys are down
+	unsigned short kp = 0; // Which keys were down in the previous frame
 	
+	const int rs_size = 5000; // Used to make sure we don't read or write out of bounds with rs
 	struct r rs[5000]; // Array of struct r (things to render on screen)
-	// (If theres more than 5000 at once it would probably glitch or something, but you'll never need that many)
 	int rslen = 0; // How many need to be rendered currently
 	
-	const char* sprite_sheet = "resource/gameveri_sheet_0810.png";
-	si_start(sprite_sheet);
+	si_start("resource/gameveri_sheet_0910.png");
 	
-	int state = MAIN_MENU;//MAIN_GAME;
+	int state = MAIN_MENU;
 	
 	//----------------------------------------------------------------------------------------------------------------------------------
 	// Main loop, runs about 30 times per second (si_draw() regulates the frame duration)
@@ -41,18 +28,35 @@ int main(void) {
 	
 	while (si_isRunning() && state != MAIN_QUIT) {
 		
-		si_keys(&keyW, &keyA, &keyS, &keyD, &keySpace, &keyG); // READ KEYBOARD INPUT
+		// READ KEYBOARD INPUT
+		kd = si_keys();
 		
 		// TICK PROGRAM LOGIC
 		switch (state) {
 			case MAIN_MENU:
-				state = m_tick(rs, &rslen, keyW, keyA, keyS, keyD, keySpace);
+				int menu_instruction;
+				state = m_tick(rs, &rslen, rs_size, kd, kp, &menu_instruction); // Menu tick
+				if (menu_instruction) {
+					switch (menu_instruction) {
+						case 1:
+							g_load_level("level1.txt");
+							break;
+						case 2:
+							g_load_level("level2.txt");
+							break;
+					}
+				}
 				break;
 			case MAIN_GAME:
-				state = g_tick(rs, &rslen, keyW, keyA, keyS, keyD, keySpace, keyG);
+				state = g_tick(rs, &rslen, rs_size, kd, kp); // Game tick
 				break;
 		}
-		si_draw(rs, rslen); // RENDER EVERYTHING ONTO THE SCREEN
+		
+		// RENDER rs ONTO THE SCREEN
+		si_draw(rs, rslen);
+		
+		// RECORD HELD KEYS FOR NEXT FRAME'S REFERENCE
+		kp = kd;
 	}
 	
 	si_end();

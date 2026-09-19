@@ -1,5 +1,4 @@
-#include <stdbool.h>
-#include <stdio.h>
+
 #include "g_ortho_forms.c"
 #include "g_level_loading.c"
 #include "g_averi.c"
@@ -8,213 +7,195 @@
 // GAME DATA
 //------------------------------------------------------------------------------------------------------------------------------------------
 
-//Note: for file-scope data like these, static just means only game.c can use them
-
-static int frameNo = 0;
+int frameNo = 0;
 
 // Camera data
-static int camera_x = 0;
-static int camera_y = 0;
-static int camera_shift_x = 0;
-static int camera_shift_y = 0;
-static const int cam_shift_spd = 2;
-const int max_cam_shift = 60;
+int camera_x = 0;
+int camera_y = 0;
 
-// Collision rectangles data in immediate area (Do not load in more than 5000 at a time)
-static struct coll_rect crs[5000];
-static int crlen = 0;
+// Collision rectangles data in immediate area
+const int crs_size = 5000;
+struct coll_rect crs[5000];
+int crlen = 0;
 
-// The Level and an array for all segments in visible area
-struct level* testlevel = NULL;
-int seg_index_memory[1000];
+// The Level
+struct level* the_level = NULL;
+const char* the_level_filename = NULL;
 
-//------------------------------------------------------------------------------------------------------------------------------------------
+void g_load_level(const char* level_filename) {
+	if (the_level != NULL)
+		gll_unload_level(the_level);
+	the_level = gll_load_level(level_filename);
+	the_level_filename = level_filename;
+}
+
+#include "g_level_editing.c"
+
+//----------------------------------------------------------------------------------------------------------------------------------------------------
 // GAME TICK FUNCTION (Called about 30 times per second by the main loop)
-//------------------------------------------------------------------------------------------------------------------------------------------
+//----------------------------------------------------------------------------------------------------------------------------------------------------
 
-int g_tick(struct r* rs, int* rslen, bool keyW, bool keyA, bool keyS, bool keyD, bool keySpace, bool keyG) {
+int g_tick(struct r* rs, int* rslen, int rs_size, unsigned short kd, unsigned short kp) {
 	
-	*rslen = 0; // I do this here because itll keep going up as the program loops otherwise
+	if (the_level == NULL) {
+		the_level = gll_load_level("testlevel.txt");
+		the_level_filename = "testlevel.txt";
+	}
+	
+	// Level geometry --------------------------------------------------------------------------------------------------------------------------------
+	
+	// Determine the current visible quadrant --------------------------------------------------------------------------------------------------------
+	
+	int quadcolumns = the_level->n_quadrants / the_level->quad_row_length;
+	
+	int quad_col = (camera_x-the_level->lolx) / seg_w; // (seg_w because quads overlap and are spaced the same as segments)
+	if (quad_col < 0) quad_col = 0;
+	if (quad_col > (the_level->quad_row_length - 1)) quad_col = (the_level->quad_row_length - 1);
+	
+	int quad_row = (camera_y-the_level->loty) / seg_h;
+	if (quad_row < 0) quad_row = 0;
+	if (quad_row > (quadcolumns - 1)) quad_row = (quadcolumns - 1);
+	
+	int cq_index = (quad_row * the_level->quad_row_length) + quad_col; // Index of the current quadrant
+	struct level_quadrant cq = the_level->quadrants[ cq_index ]; // The current quadrant
+	
+	// Display and note collision data for all level geometry indexed by the current quadrant --------------------------------------------------------
+	
+	*rslen = 0;
 	crlen = 0;
 	
-	if (testlevel == NULL) {
-		testlevel = load_level("testlevel.txt");
-		printdemo_level(testlevel);
+	// Add the quadrant's render instructions
+	for (int i = 0; i < cq.n_rinds; i++) {
+		add_r(the_level->lrs[cq.rinds[i]], rslen, rs, rs_size);
 	}
 	
-	// Level geometry -------------------------------------------------------------------------------------------------------
-	
-	
-	// Determine the current visible segment quartet --------------------------------------------------------------
-	
-	int left_seg_col = (camera_x-testlevel->lolx) / seg_w;
-	if (left_seg_col < 0) left_seg_col = 0;
-	if (left_seg_col > (testlevel->n_segments_per_row - 2)) left_seg_col = (testlevel->n_segments_per_row - 2);
-	
-	int top_seg_row = (camera_y-testlevel->loty) / seg_h;
-	if (top_seg_row < 0) top_seg_row = 0;
-	if (top_seg_row > (testlevel->n_segment_rows - 2)) top_seg_row = (testlevel->n_segment_rows - 2);
-	
-	// Segment indices for the visible four segments
-	int topleftseg = left_seg_col + (testlevel->n_segments_per_row) * top_seg_row;
-	int bottomleftseg = topleftseg + testlevel->n_segments_per_row;
-	int toprightseg = topleftseg + 1;
-	int bottomrightseg = bottomleftseg + 1;
-	
-	// Check all four segments and add their contents to seg_index_memory -----------------------------------------
-	
-	// Zero out seg_index_memory
-	for (int i = 0; i < 1000; i++)
-		seg_index_memory[i] = 0;
-		
-	int sim_i = 0; // Current length of seg_index_memory
-	
-	// Add the contents of topleftseg to seg_index_memory
-	for (int i = 0; i < (testlevel->segments[topleftseg].len); i++) {
-		seg_index_memory[sim_i] = (testlevel->segments[topleftseg].data[i]);
-		sim_i++;
+	// Add the quadrant's collision rectangles
+	for (int i = 0; i < cq.n_crinds; i++) {
+		add_cr(the_level->lcrs[cq.crinds[i]], &crlen, crs, crs_size);
 	}
-	// Add any new contents found in toprightseg
-	bool already_there;
-	for (int i = 0; i < (testlevel->segments[toprightseg].len); i++) {
-		already_there = 0; // Assume it's not until its found
-		for(int j = 0; j < sim_i; j++) {
-			if ( (testlevel->segments[toprightseg].data[i]) == seg_index_memory[j] ) {
-				already_there = 1;
-				break;
-			}
-		}
-		if (!already_there) {
-			seg_index_memory[sim_i] = (testlevel->segments[toprightseg].data[i]);
-			sim_i++;
-		}
-	}
-	// Add any new contents found in bottomleftseg
-	for (int i = 0; i < (testlevel->segments[bottomleftseg].len); i++) {
-		already_there = 0; // Assume it's not until its found
-		for(int j = 0; j < sim_i; j++) {
-			if ( (testlevel->segments[bottomleftseg].data[i]) == seg_index_memory[j] ) {
-				already_there = 1;
-				break;
-			}
-		}
-		if (!already_there) {
-			seg_index_memory[sim_i] = (testlevel->segments[bottomleftseg].data[i]);
-			sim_i++;
-		}
-	}
-	// Add any new contents found in bottomrightseg
-	for (int i = 0; i < (testlevel->segments[bottomrightseg].len); i++) {
-		already_there = 0; // Assume it's not until its found
-		for(int j = 0; j < sim_i; j++) {
-			if ( (testlevel->segments[bottomrightseg].data[i]) == seg_index_memory[j] ) {
-				already_there = 1;
-				break;
-			}
-		}
-		if (!already_there) {
-			seg_index_memory[sim_i] = (testlevel->segments[bottomrightseg].data[i]);
-			sim_i++;
-		}
-	}
+	//if (!(frameNo%30)) printf("(game.c) %i rinds and %i crinds in this quadrant\n", cq.n_rinds, cq.n_crinds);
 	
-	// Display all level geometry indexed to seg_index_memory -----------------------------------------------------
+	// Display & collision-register all non-indexed level geometry that has been created by the player using cheats ----------------------------------
 	
-	for (int i = 0; i < sim_i; i++) {
-		int j = seg_index_memory[i];
-		struct vectlist this = testlevel->features[j];
-		ortho_form_2(
+	for (int i = 0; i < n_new_forms; i++) {
+		struct oform this = new_forms[i];
+		ortho_form(
 			this.x, this.y,
 			this.vectmags, this.vectdirs, this.len,
 			this.tile_type,
-			rs, rslen, crs, &crlen);
+			rs, rslen, rs_size, crs, &crlen, crs_size);
 	}
 	
-	
-	if (keySpace && !space_held && keyS) { // BIG OL' DEBUG PRINTOUT
+	if (keySPACEdown(kd) && !keySPACEdown(kp) && keySdown(kd)) { // BIG OL' DEBUG PRINTOUT
 		printf("################################ DEBUG PRINTOUT ################################\n");
-		/*
-		printf("Top seg row %i, left seg col %i\n", top_seg_row, left_seg_col);
-		printf("camera_y %i\n", camera_y);
-		printf("testlevel->loty %i\n", testlevel->loty);
-		printf("seg_h %i\n", seg_h);
-		printf("camera_y-testlevel->loty %i\n", camera_y-testlevel->loty);
-		printf("(camera_y-testlevel->loty)/seg_h %i\n\n", (camera_y-testlevel->loty)/seg_h);
-		*/
-		printf("Full segment map:\n");
-		for (int i = 0; i < testlevel->n_segment_rows*testlevel->n_segments_per_row; i++) {
-			printf("%i %s%c", i, (i>9?" ":"  "), (((i+1)%testlevel->n_segments_per_row)?' ':'\n') );
-		}
-		
-		printf("Current segment quartet:\n%i %i\n%i %i\n", topleftseg, toprightseg, bottomleftseg, bottomrightseg);
-		/*
-		printf("\nSegment contents:\n");
-		for (int i = 0; i < testlevel->n_segment_rows*testlevel->n_segments_per_row; i++) {
-			printf("[");
-			for (int j = 0; j < testlevel->segments[i].len; j++) {
-				printf("%i ", testlevel->segments[i].data[j]);
-			}
-			printf("]%c", (((i+1)%testlevel->n_segments_per_row)?' ':'\n') );
-		}
-		printf("\n");
-		*/
-		printf("Visible features:\n");
-		for (int i = 0; i < sim_i; i++)
-			printf("%i ", seg_index_memory[i]);
-		printf("\n");
-		
-		//printdemo_level(testlevel);
+		printf("rslen %i, &rslen %p\n", (*rslen), rslen);
+		printf("rs %p\n", rs);
+		printf("crlen %i, &crlen %p\n", crlen, &crlen);
+		printf("crs %p\n", crs);
+		printf("the_level->n_lrs %i, ->nlcrs %i\n", the_level->n_lrs, the_level->n_lcrs);
+		printf("n_new_forms %i, &n_new_forms %p\n", n_new_forms, &n_new_forms);
+		printf("new_forms %p\n", new_forms);
+		//printf("clock() is %li\n", clock());
 	}
 	
-	averi_tick(keyW, keyA, keyS, keyD, keySpace, crs, &crlen, frameNo);
+	// God/Level-edit mode tick ----------------------------------------------------------------------------------------------------------------------
+	
+	// G key toggles god mode (Though you cannot leave god-mode in the middle of editing a shape)
+	if (keyGdown(kd) && !keyGdown(kp) && (!editor_mode || !god_mode))
+		god_mode = !god_mode;
 		
-	// Averi rendering data -------------------------------------------------------------------------------------------------
+	if (god_mode) { // Noclip and can edit level
+		god_tick(kd, kp);
+		god_render(rslen, rs, rs_size);
+	}
 	
-	struct r averi = {
-		.source_x=0, .source_y=(90*averiState), .source_w=100, .source_h=90,
-		.dest_x=averiX-50, .dest_y=averiY, .dest_w=0, .dest_h=0,
-		.visible=1,
-		.flip_horizontal=averiRightFace, .flip_vertical=0
-		};
-	struct r averi_tail = {
-		.source_x=0, .source_y=(2337 + 35*tailState), .source_w=100, .source_h=35,
-		.dest_x=averiX-50, .dest_y=averiY+44, .dest_w=0, .dest_h=0,
-		.visible=(!averiState), // (Tail is only rendered separately at stand-still)
-		.flip_horizontal=averiRightFace, .flip_vertical=0
-		};
+	else
 	
-	rs[*rslen] = averi;
-	rs[*rslen+1] = averi_tail;
-	*rslen += 2;
+	// Normal game tick ------------------------------------------------------------------------------------------------------------------------------
 	
-	// Camera offsetting ----------------------------------------------------------------------------------------------------
+	{ // Normal averi physics and animation
+		averi_tick(kd, kp, crs, &crlen);
+		
+		// Place the camera to center on Averi
+		camera_x = averiX - (ideal_w/2);
+		camera_y = averiY - (ideal_h/2);
+		
+		static int camera_shift_x = 0;
+		static int camera_shift_y = 0;
+		static const int cam_shift_spd = 2;
+		static const int max_cam_shift = 60;
+		static int manual_shift_x = 0;
+		static int manual_shift_y = 0;
+		static const int manual_shift_spd = 50;
+		
+		// Gently shift the camera with her velocity (So you see further ahead where you're going)
+		if (camera_shift_x < averiVx*4 && camera_shift_x < max_cam_shift)
+			camera_shift_x += cam_shift_spd;
+		else if (camera_shift_x > averiVx*4 && camera_shift_x > -max_cam_shift)
+			camera_shift_x -= cam_shift_spd;
+		if (camera_shift_y < averiVy*2 && camera_shift_y < max_cam_shift)
+			camera_shift_y  += cam_shift_spd;
+		else if (camera_shift_y > averiVy*2 && camera_shift_y > -max_cam_shift)
+			camera_shift_y -= cam_shift_spd;
+		
+		// Apply manual camera shift by use of arrow keys
+		if (keyUPdown(kd) && !keyDOWNdown(kd)) {
+			// Arrow up
+			if (manual_shift_y > -ideal_h/3) manual_shift_y -= manual_shift_spd;
+		} else if (!keyUPdown(kd) && keyDOWNdown(kd)) {
+			// Arrow down
+			if (manual_shift_y < ideal_h/3) manual_shift_y += manual_shift_spd;
+		} else {
+			// No vertical arrow
+			if (manual_shift_y > manual_shift_spd) manual_shift_y -= manual_shift_spd;
+			else if (manual_shift_y <-manual_shift_spd) manual_shift_y += manual_shift_spd;
+			else manual_shift_y = 0;
+		}
+		if (keyLEFTdown(kd) && !keyRIGHTdown(kd)) {
+			// Arrow left
+			if (manual_shift_x > -ideal_h/2) manual_shift_x -= manual_shift_spd;
+		} else if (!keyLEFTdown(kd) && keyRIGHTdown(kd)) {
+			// Arrow right
+			if (manual_shift_x < ideal_h/2) manual_shift_x += manual_shift_spd;
+		} else {
+			// No horizontal arrow
+			if (manual_shift_x > manual_shift_spd) manual_shift_x -= manual_shift_spd;
+			else if (manual_shift_x <-manual_shift_spd) manual_shift_x += manual_shift_spd;
+			else manual_shift_x = 0;
+		}
+		
+		// Apply all shifts to the camera position
+		camera_x += camera_shift_x + manual_shift_x;
+		camera_y += camera_shift_y + manual_shift_y;
+	}
+		
+	// Averi rendering instructions ------------------------------------------------------------------------------------------------------------------
 	
-	// Place the camera to center on Averi
-	camera_x = averiX - (ideal_w/2);
-	camera_y = averiY - (ideal_h/2);
+	add_r(
+		(struct r) {
+			.source_x=0, .source_y=(90*averiState), .source_w=100, .source_h=90,
+			.dest_x=averiX-50, .dest_y=averiY, .dest_w=0, .dest_h=0,
+			.flip_horizontal=averiRightFace, .flip_vertical=false
+		}, rslen, rs, rs_size);
+		
+	if (!averiState) { // Tail is only rendered separately when she's standing still, at averiState 0
+		add_r(
+			(struct r) {
+				.source_x=0, .source_y=(2697 + 35*tailState), .source_w=100, .source_h=35,
+				.dest_x=averiX-50, .dest_y=averiY+44, .dest_w=0, .dest_h=0,
+				.flip_horizontal=averiRightFace, .flip_vertical=false
+			}, rslen, rs, rs_size);
+	}
 	
-	// Gently shift the camera with her velocity (So you see further ahead where you're going)
-	if (camera_shift_x < averiVx*4) camera_shift_x += cam_shift_spd;
-	else if (camera_shift_x > averiVx*4) camera_shift_x -= cam_shift_spd;
-	if (camera_shift_y < averiVy*2) camera_shift_y  += cam_shift_spd;
-	else if (camera_shift_y > averiVy*2) camera_shift_y -= cam_shift_spd;
+	// Camera offsetting -----------------------------------------------------------------------------------------------------------------------------
 	
-	// (Limit the camera shift before applying it)
-	if (camera_shift_x > max_cam_shift) camera_shift_x = max_cam_shift;
-	if (camera_shift_x <-max_cam_shift) camera_shift_x =-max_cam_shift;
-	if (camera_shift_y > max_cam_shift) camera_shift_y = max_cam_shift;
-	if (camera_shift_y <-max_cam_shift) camera_shift_y =-max_cam_shift;
-	
-	camera_x += camera_shift_x;
-	camera_y += camera_shift_y;
-	
-	// Offset everything by the camera's position
+	// Offset every render-instruction by the camera's position
 	for (int i = 0; i < (*rslen); i++) {
 		rs[i].dest_x -= camera_x;
 		rs[i].dest_y -= camera_y;
 	}
 	
-	// Final steps ----------------------------------------------------------------------------------------------------------
+	// Final steps -----------------------------------------------------------------------------------------------------------------------------------
 	
 	frameNo += 1;
 	
