@@ -13,18 +13,18 @@ static int editor_start_x = 0;
 static int editor_start_y = 0;
 
 // Data for the current ortho-form being worked on, "editor_form"
-static struct oform editor_form = {
+static struct entryform editor_form = {
 	.x = 0,
 	.y = 0,
 	.tile_type = 0,
-	.len = 0,
+	.perlen = 0,
 	.vectmags = NULL,
 	.vectdirs = NULL
 };
 
 // Data for all finished features created
 int n_new_forms = 0;
-struct oform new_forms[20];
+struct entryform new_forms[20];
 const static int editor_max_new_forms = 10; // (Exceed this and it'll warn you)
 
 // Starting coordinates position data of the vector being worked on
@@ -53,11 +53,11 @@ int editor_mode = EDITOR_READY;
 // Add the working-feature to new_forms and reset working-feature data for the next feature
 static void god_add_form(void) {
 	//printf("ADDING EDITOR FEATURE\n\t{.x=%i, .y=%i, .tile_type=%i, .len=%i,...}\nTO new_forms\n", editor_form.x, editor_form.y, editor_form.tile_type, editor_form.len);
-	new_forms[n_new_forms] = (struct oform) {
+	new_forms[n_new_forms] = (struct entryform) {
 		.x = editor_form.x,
 		.y = editor_form.y,
 		.tile_type = editor_form.tile_type,
-		.len = editor_form.len,
+		.perlen = editor_form.perlen,
 		.vectmags = editor_form.vectmags,
 		.vectdirs = editor_form.vectdirs
 	};
@@ -84,7 +84,7 @@ static void god_save_new_forms(void) {
 	fprintf(fp, "\n# Geometry saved %s:\n\n", buffer);
 	for (int i = 0; i < n_new_forms; i++) {
 		fprintf(fp, "A.%i.%i.%i.\n", new_forms[i].x, new_forms[i].y, new_forms[i].tile_type);
-		for (int j = 0; j < new_forms[i].len; j++) {
+		for (int j = 0; j < new_forms[i].perlen; j++) {
 			fprintf(fp, "%i %c ", new_forms[i].vectmags[j], new_forms[i].vectdirs[j] ? 'L':'R');
 		}
 		fprintf(fp, ".\n\n");
@@ -134,29 +134,29 @@ void god_tick(unsigned short k, unsigned short k_held) {
 		
 		// Pressing backspace/delete discards the current vector
 		if (keyDELdown(k) && !keyDELdown(k_held)) {
-			if (editor_form.len == 0) { // If you haven't placed any edges yet, backspace will take you back to EDITOR_READY mode,
+			if (editor_form.perlen == 0) { // If you haven't placed any edges yet, backspace will take you back to EDITOR_READY mode,
 				editor_mode = EDITOR_READY;
 			} else { // Otherwise, it will undo the last vertex and give you back the last vertex's working data
 				// Deduce what the previous state of editor_negative must have been
 				if (editor_negative) {
-					editor_negative = (editor_form.vectdirs[editor_form.len-1] != editor_vertical);
+					editor_negative = (editor_form.vectdirs[editor_form.perlen-1] != editor_vertical);
 				} else {
-					editor_negative = (editor_form.vectdirs[editor_form.len-1] == editor_vertical);
+					editor_negative = (editor_form.vectdirs[editor_form.perlen-1] == editor_vertical);
 				}
 				// (The previous state of editor_vertical is even easier to deduce)
 				editor_vertical = !editor_vertical;
 				
 				// Now that we're oriented like the previous vector, we can just undo the change in editor_new_x/_y that it would have caused
 				if (editor_vertical) {
-					editor_new_y -= (editor_negative? -editor_form.vectmags[editor_form.len-1] : editor_form.vectmags[editor_form.len-1]);
+					editor_new_y -= (editor_negative? -editor_form.vectmags[editor_form.perlen-1] : editor_form.vectmags[editor_form.perlen-1]);
 				} else { // (editor horizontal)
-					editor_new_x -= (editor_negative? -editor_form.vectmags[editor_form.len-1] : editor_form.vectmags[editor_form.len-1]);
+					editor_new_x -= (editor_negative? -editor_form.vectmags[editor_form.perlen-1] : editor_form.vectmags[editor_form.perlen-1]);
 				}
 				// Now we just put the old vector's magnitude and direction back into the working variables,
-				editor_newedge_mag = editor_form.vectmags[editor_form.len-1];
-				editor_newcorner_dir = editor_form.vectdirs[editor_form.len-1];
+				editor_newedge_mag = editor_form.vectmags[editor_form.perlen-1];
+				editor_newcorner_dir = editor_form.vectdirs[editor_form.perlen-1];
 				// and discard the old vector from editor_form.
-				editor_form.len--;
+				editor_form.perlen--;
 			}
 		}
 		
@@ -186,7 +186,7 @@ void god_tick(unsigned short k, unsigned short k_held) {
 		// Pressing space finalizes the vector, and we either immediately begin the next vector, or finish the shape and return to EDITOR_READY
 		if (keySPACEdown(k) && !keySPACEdown(k_held)) {
 			// Add the new vector to the editor_form
-			oform_addvect(editor_newedge_mag, editor_newcorner_dir, &editor_form);
+			entryform_addvect(editor_newedge_mag, editor_newcorner_dir, &editor_form);
 			
 			// Update editor_new_x and _new_y
 			if (editor_vertical) {
@@ -205,12 +205,12 @@ void god_tick(unsigned short k, unsigned short k_held) {
 			if (!(editor_vertical || editor_negative) &&
 				(editor_new_x == editor_start_x) &&
 				(editor_new_y == editor_start_y) ) {
-					printf("EDITOR FORM .len=%i,\n", editor_form.len);
+					printf("EDITOR FORM .len=%i,\n", editor_form.perlen);
 					editor_form.x = editor_start_x;
 					editor_form.y = editor_start_y;
 					editor_form.tile_type = 20; // (Will get overwritten anyway)
 					god_add_form();
-					editor_form.len = 0;
+					editor_form.perlen = 0;
 					editor_mode = EDITOR_COLORING;
 					editor_newform_clr = 0;
 			}
@@ -262,7 +262,7 @@ void god_tick(unsigned short k, unsigned short k_held) {
 					editor_newedge_mag = abs(editor_new_x - editor_start_x);
 					editor_newcorner_dir = false;
 					// Add the vector
-					oform_addvect(editor_newedge_mag, editor_newcorner_dir, &editor_form);
+					entryform_addvect(editor_newedge_mag, editor_newcorner_dir, &editor_form);
 					// Update this
 					editor_new_x = editor_negative ? (editor_new_x-editor_newedge_mag) : (editor_new_x+editor_newedge_mag);
 					// Set these in readiness for the next vector
@@ -343,7 +343,7 @@ void god_render(int* rslen, struct r* rs, int rs_size) {
 		int preview_y = editor_start_y;
 		bool preview_vert = false;
 		bool preview_neg = false;
-		for (int i = 0; i < editor_form.len; i++) { // For each ortho_vertex...
+		for (int i = 0; i < editor_form.perlen; i++) { // For each ortho_vertex...
 			bool corner_flip_h, corner_flip_v;
 			int vect_mag = editor_form.vectmags[i]; // This vector's magnitude
 			bool vect_lft = editor_form.vectdirs[i]; // This vector's end direction, true means left-turn, false means right-turn

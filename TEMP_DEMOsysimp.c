@@ -22,7 +22,7 @@ void si_start(const char* sprite_sheet) {
 	
 	SetConfigFlags(FLAG_WINDOW_RESIZABLE); //Set before InitWindow
 	
-    InitWindow(screenDefWidth, screenDefHeight, "Averi game prototype 2026-09-17");
+    InitWindow(screenDefWidth, screenDefHeight, "Averi game prototype 2026-10-01");
     
 	//SetExitKey(KEY_NULL); // Disable the default escape-key closing the window action
 	

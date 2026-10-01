@@ -1,55 +1,45 @@
-# [Feature 0] Ground ( Located at (0, 350), tile type 3 )
+# Ground ( Located at (0, 350), tile type 3 which is brown )
 A.0.350.3.
 1800R 100R 1800R 100R.
 
-# Wave
-A.1000.100.0.
-60R 60L 84R 24R 120R 72L 24R 12R.
+# A green S-shaped form
+A.420.10.6.
+200 R 20 R 180 L 100 L 180 R 90 R 315 R 20 R 295 L 50 L 180 R 140 R .
 
-# Block
-A.650.-200.1.
-200R 400R 200R 400R.
+# A light-gray moving platform
+B.470.160.2.
+110 R 25 R 110 R 25 R .
+-300X -300Y 300X -300X 300Y 300X.
 
-# Spool
-A.260.50.2.
-160R 20R 20L 20L 20R 20R 160R 20R 20L 20L 20R 20R.
+# Blue lever
+C.1200.350.33.
 
-# Pinwheel
-A.1000.-400.4.
-180R 120L 60L 120R 60R
-180R 120L 60L 120R 60R
-180R 120L 60L 120R 60R
-180R 120L 60L 120R 60R.
+# Yellow lever
+C.1300.350.34.
 
-# Square
-A.1400.0.5.
-60R 60R 60R 60R.
+# Red lever
+C.1400.350.35.
 
-# [Feature 6] Upper area made of another ground shape and two squares
-A.1500.-400.6.
-1800R 100R 1800R 100R.
+# Blue door
+B.1500.-100.12.
+30 R 450 R 30R 450 R.
+-100Y.
 
-A.1700.-699.7.
-60R 60R 60R 60R.
+# Yellow door
+B.1540.-100.13.
+30 R 450 R 30R 450 R.
+-100Y.
 
-A.2450.-699.8.
-60R 60R 60R 60R.
+# Red door (It moves in a different way)
+B.1580.200.14.
+30 R 150 R 30R 150 R.
+30X -100Y.
 
-# New stuff, because I need a much bigger map to actually load any different segments
-
-# [Feature 9] A big big block
-A.3500.-500.3.
-5000R 500R 5000R 500R.
-
-# Bigger pinwheel
-A.6000.-1100.2.
-300R 200L 100L 200R 100R
-300R 200L 100L 200R 100R
-300R 200L 100L 200R 100R
-300R 200L 100L 200R 100R.
-
-# A floating box next to the big pinwheel
-A.6650.-900.3.
-100R 200R 100R 200R.
+# Gray wall over red door
+A.1580.-100.0.
+30 R 300 R 30 R 300 R.
 
 
+# COPYPASTED for testing purposes
+A.3500.700.1.
+225 L 200 R 50 R 200 L 225 R 50 R 500 R 50 R .

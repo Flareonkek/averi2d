@@ -1,5 +1,5 @@
 
-#include "common.h"
+#include "common.c"
 #include "sysimp.c"
 //#include "TEMP_DEMOsysimp.c" // JUST TO SHOW OFF LOADING
 #include "menu.c"
@@ -18,7 +18,7 @@ int main(void) {
 	struct r rs[5000]; // Array of struct r (things to render on screen)
 	int rslen = 0; // How many need to be rendered currently
 	
-	si_start("resource/gameveri_sheet_0910.png");
+	si_start("resource/gameveri_sheet_1001.png");
 	
 	int state = MAIN_MENU;
 	

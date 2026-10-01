@@ -26,7 +26,7 @@ int tilebaseY(int tile_type) {
 
 // Make a shape from an array of vectors forming the shape's perimeter. All vertices are 90 degree turns to the left or right.
 // The first vector, at (start_x, start_y), is horizontal and positive (pointing east), and there are perimeterlen vectors.
-// Each vertex has its length (per_mag) and direction (per_dir) describing the line to the next vertex and the turn-direction
+// Each vector has its length (per_mag) and direction (per_dir) describing the line to the next vertex and the turn-direction
 // (true for left, false for right) to face the cardinal-direction that the next one will point.
 // The vertices must be arranged clockwise to form a closed perimeter.
 // Also, the caller passes in pointers to its rendering and collision data for this function to add to them.
@@ -34,7 +34,7 @@ int tilebaseY(int tile_type) {
 static void ortho_form( // ------------------------------------------------------------------------------------------------------------
 	int start_x, int start_y, // Where to start making the shape
 	int per_mags[], bool per_dirs[], int perimeterlen, // The vectors forming the shape's perimeter
-	int tile_type, // (There are 21 different tile designs on the sprite sheet, set it to anything 0~20)
+	int tile_type, // (There are 21 different tile designs on the sprite sheet; set it to anything 0~20)
 	struct r* rs, int* rslen, int rs_size, // Pointers and limit to add onto the caller's rendering data
 	struct coll_rect* crs, int* crlen, int crs_size) // Pointers  & limit to add onto the caller's collision data
 {
@@ -45,10 +45,9 @@ static void ortho_form( // -----------------------------------------------------
 	int n_colliders = 0; // Initialize empty
 	int first_collider_i = (*crlen); // (add new colliders at and after this index)
 	struct bottom {int x; int y; int len;};
-	struct bottom bottoms[perimeterlen]; // x and y are the origin, that is, the eastern point of the negative-direction line
+	struct bottom bottoms[perimeterlen]; // x and y are the origin, that is, the eastern point of the horizontal negative line
 	int n_bottoms = 0;
 	int vxs[perimeterlen]; // Vertex Xs (We'll split all collision rectangles at these X-points)
-	int vys[perimeterlen]; // Corresponding Ys (For collision rectangle expansion)
 	
 	// Run through vertices initializing a collider on each top edge, and a bottom on each bottom edge --------------------------------
 	
@@ -56,7 +55,6 @@ static void ortho_form( // -----------------------------------------------------
 		int vect_mag = per_mags[i]; // This vector's magnitude
 		bool vect_lft = per_dirs[i]; // This vector's end direction, true if left-turn, false if right-turn
 		vxs[i] = x;
-		vys[i] = y;
 		
 		if (vertical) {
 			// Update position
@@ -67,7 +65,7 @@ static void ortho_form( // -----------------------------------------------------
 				bottoms[n_bottoms] = (struct bottom) {x, y, vect_mag};
 				n_bottoms++;
 				x -= vect_mag; // Update position
-			} else { //...it's a horizontal positive vertex
+			} else { //...it's a horizontal positive vector
 				// Add a collision rectangle
 				if (first_collider_i + 1 >= crs_size) {
 					printf("ERROR in g_ortho_forms.c: Finna overflow crs with this %i-vector shape, with crs already at %i out of %i items full\n", perimeterlen, first_collider_i, crs_size);
@@ -79,7 +77,7 @@ static void ortho_form( // -----------------------------------------------------
 				x += vect_mag; // Update position
 			}
 		}
-		// Set these for the next vertex:
+		// Set these for the next vector:
 		negative = ( vertical == negative? (vect_lft) : !(vect_lft) );
 		vertical = !vertical;
 	}
@@ -126,6 +124,9 @@ static void ortho_form( // -----------------------------------------------------
 		}
 	}
 	
+	// Note how many colliders we added to argument crs
+	(*crlen) += n_colliders;
+	
 	// Now expand the colliders down to the bottom edges, making them fully fledged collision rectangles ------------------------------
 	
 	for (int i = first_collider_i; i < first_collider_i + n_colliders; i++) {
@@ -150,10 +151,6 @@ static void ortho_form( // -----------------------------------------------------
 			rslen, rs, rs_size
 		);
 	}
-	
-	// Note how many colliders we added to argument crs -------------------------------------------------------------------------------
-	
-	(*crlen) += n_colliders;
 	
 	// Add edges' and corners' rendering instructions to argument rs ------------------------------------------------------------------
 	
@@ -230,7 +227,7 @@ static void ortho_form( // -----------------------------------------------------
 			rslen, rs, rs_size
 		);
 		
-		// Set these for the next vertex:
+		// Set these for the next vector:
 		negative = ( vertical == negative? (vect_lft) : !(vect_lft) );
 		vertical = !vertical;
 

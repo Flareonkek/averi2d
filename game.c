@@ -1,7 +1,10 @@
 
-#include "g_ortho_forms.c"
-#include "g_level_loading.c"
+#include "g_common.c"
 #include "g_averi.c"
+#include "g_ortho_forms.c"
+#include "g_mobile_forms.c"
+#include "g_simple_forms.c"
+#include "g_level_loading.c"
 
 //------------------------------------------------------------------------------------------------------------------------------------------
 // GAME DATA
@@ -22,11 +25,16 @@ int crlen = 0;
 struct level* the_level = NULL;
 const char* the_level_filename = NULL;
 
+
 void g_load_level(const char* level_filename) {
 	if (the_level != NULL)
 		gll_unload_level(the_level);
 	the_level = gll_load_level(level_filename);
 	the_level_filename = level_filename;
+	
+	for (int i = 0; i < 8; i++) {
+		colorstates[i] = false;
+	}
 }
 
 #include "g_level_editing.c"
@@ -59,6 +67,18 @@ int g_tick(struct r* rs, int* rslen, int rs_size, unsigned short kd, unsigned sh
 	int cq_index = (quad_row * the_level->quad_row_length) + quad_col; // Index of the current quadrant
 	struct level_quadrant cq = the_level->quadrants[ cq_index ]; // The current quadrant
 	
+	// Mobile forms tick (must occur BEFORE the quadrant's crs are loaded, as it changes certain the_level->lcrs, which must happen THIS FRAME)
+	mobile_forms_tick(the_level, cq);
+	/*
+	for (int i = 0; i < the_level->n_lmfs; i++) {
+		mobile_form_tick(
+			&the_level->lmfs[i], 
+			the_level->lrs, the_level->lcrs, the_level->n_lcrs,
+			cq.crinds, cq.n_crinds,
+			colorstates);
+	}
+	*/
+	
 	// Display and note collision data for all level geometry indexed by the current quadrant --------------------------------------------------------
 	
 	*rslen = 0;
@@ -73,29 +93,67 @@ int g_tick(struct r* rs, int* rslen, int rs_size, unsigned short kd, unsigned sh
 	for (int i = 0; i < cq.n_crinds; i++) {
 		add_cr(the_level->lcrs[cq.crinds[i]], &crlen, crs, crs_size);
 	}
-	//if (!(frameNo%30)) printf("(game.c) %i rinds and %i crinds in this quadrant\n", cq.n_rinds, cq.n_crinds);
+	
+	// Add the quadrant's levers
+	for (int i = 0; i < cq.n_linds; i++) {
+		struct lever this = the_level->lls[ cq.linds[i] ];
+		// (Displayed differently depending on the matching colorstate)
+		if (colorstates[ this.color ]) { // (This lever is flipped on)
+			struct r tr = {
+				.source_x= 136,
+				.source_y= 169+(lever_h*this.color),
+				.source_w= lever_w,
+				.source_h= lever_h,
+				.dest_x= this.x,
+				.dest_y= this.y-lever_h,
+				.dest_w= 0, // (Just don't scale it)
+				.dest_h= 0,
+				.flip_horizontal= true,
+				.flip_vertical= false
+			};
+			add_r(tr, rslen, rs, rs_size);
+		} else { // (This lever is flipped off)
+			struct r tr = {
+				.source_x= 136,
+				.source_y= 169+(lever_h*this.color),
+				.source_w= lever_w,
+				.source_h= lever_h,
+				.dest_x= this.x,
+				.dest_y= this.y-lever_h,
+				.dest_w= 0, // (Just don't scale it)
+				.dest_h= 0,
+				.flip_horizontal= false,
+				.flip_vertical= false
+			};
+			add_r(tr, rslen, rs, rs_size);
+		}
+	}
 	
 	// Display & collision-register all non-indexed level geometry that has been created by the player using cheats ----------------------------------
 	
 	for (int i = 0; i < n_new_forms; i++) {
-		struct oform this = new_forms[i];
+		struct entryform this = new_forms[i];
 		ortho_form(
 			this.x, this.y,
-			this.vectmags, this.vectdirs, this.len,
+			this.vectmags, this.vectdirs, this.perlen,
 			this.tile_type,
 			rs, rslen, rs_size, crs, &crlen, crs_size);
 	}
 	
 	if (keySPACEdown(kd) && !keySPACEdown(kp) && keySdown(kd)) { // BIG OL' DEBUG PRINTOUT
 		printf("################################ DEBUG PRINTOUT ################################\n");
-		printf("rslen %i, &rslen %p\n", (*rslen), rslen);
-		printf("rs %p\n", rs);
-		printf("crlen %i, &crlen %p\n", crlen, &crlen);
-		printf("crs %p\n", crs);
-		printf("the_level->n_lrs %i, ->nlcrs %i\n", the_level->n_lrs, the_level->n_lcrs);
-		printf("n_new_forms %i, &n_new_forms %p\n", n_new_forms, &n_new_forms);
-		printf("new_forms %p\n", new_forms);
-		//printf("clock() is %li\n", clock());
+		//printf("rslen %i, &rslen %p\n", (*rslen), rslen);
+		//printf("rs %p\n", rs);
+		//printf("crlen %i, &crlen %p\n", crlen, &crlen);
+		//printf("crs %p\n", crs);
+		//printf("the_level->n_lrs %i, ->nlcrs %i\n", the_level->n_lrs, the_level->n_lcrs);
+		printf("the_level-->nlcrs %i, ->lcrs[", the_level->n_lcrs); for(int i=0;i<the_level->n_lcrs;i++) printf("%i.x=%i ", i, the_level->lcrs[i].x); printf("]\n");
+		//printf("n_new_forms %i, &n_new_forms %p\n", n_new_forms, &n_new_forms);
+		//printf("new_forms %p\n", new_forms);
+		printf("Quadrant map:\n"); for(int i=0;i<the_level->n_quadrants;i++) printf("%i%c",i,((i+1)%the_level->quad_row_length?' ':'\n'));
+		printf("Current quadrant: %i\n", cq_index);
+		printf("crs in this quadrant: [\n"); for(int i=0;i<cq.n_crinds;i++) printf(" %i@%i,.x=%i ", i, cq.crinds[i], the_level->lcrs[cq.crinds[i]].x); printf("]\n");
+		//printdemo_level(the_level);
 	}
 	
 	// God/Level-edit mode tick ----------------------------------------------------------------------------------------------------------------------
@@ -114,7 +172,21 @@ int g_tick(struct r* rs, int* rslen, int rs_size, unsigned short kd, unsigned sh
 	// Normal game tick ------------------------------------------------------------------------------------------------------------------------------
 	
 	{ // Normal averi physics and animation
+		//printf("averi_tick begins with averiX of %i\n", averiX);
 		averi_tick(kd, kp, crs, &crlen);
+		//printf("averi_tick ends with averiX of %i\n\n", averiX);
+		
+		// If she's standing by a lever, W or S can be pressed to flip it
+		for (int i = 0; i < cq.n_linds; i++) {
+			struct lever this = the_level->lls[ cq.linds[i] ];
+			if (averiX+averiW >= this.x && averiX-averiW <= (this.x+lever_w) &&
+				averiY+averiH >= this.y && averiY <= (this.y+lever_w) &&
+				( (keyWdown(kd) && !keyWdown(kp)) || (keySdown(kd) && !keySdown(kp)) )
+				)
+			{
+				colorstates[this.color] = !colorstates[this.color];
+			}
+		}
 		
 		// Place the camera to center on Averi
 		camera_x = averiX - (ideal_w/2);

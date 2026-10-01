@@ -3,24 +3,26 @@
 // FILE-SCOPE DATA
 //------------------------------------------------------------------------------------------------------------------------------------------
 
-// Player character data
+// Generally relevant Averi data
 int averiX = 900; // Her X location (at her center)
 int averiY = 260; // Her Y location (top of her head)
 const int averiW = 28; // It's actually half her width, her X is the center of her sprite and its 28 pixels to either side.
 const int averiH = 90; // Her full height, her Y is at the top of her sprite.
+int averiState = 0; // Which sprite to draw for animation
+// 0: standing still, 1~2: starting run, 3~10: running, 11~15: ground turn, 16~19: aerial turn, 20~23: jump/fall, 24: ledge hang, 25~29: ledge climbing
 
+// Data only relevant in this file
 static bool averi_airborne = 0;
-static int averi_climbing = 0;
+int averi_climbing = 0;
 static int averiVx = 0; // Her X-axis velocity
 static int averiVy = 0;
 static const int runspd_max = 15;
-static int averiState = 0; // Which sprite to draw for animation
 static int tailState = 3;
 static bool tailSwing = 0; // Remember which way it was swinging last time it was
 static bool averiRightFace = 0;
 static const int avg_stride = 8; // How many pixels of travel each frame represents
 static int animDX = 0; // X-travel since last walk/run frame change (So animations look right at any speed)
-static int averiCounterV = 0; // How much velocity is to be counteracted when turning around (Used for animation smoothness)
+static int averiCounterV = 0; // How much velocity is to be counteracted when turning around (Used for animation timing)
 static bool averiCounter_hold = false; // Used in conjunction with above
 
 //------------------------------------------------------------------------------------------------------------------------------------------
@@ -149,17 +151,17 @@ static void averi_tick(unsigned short k, unsigned short k_held, struct coll_rect
 		}
 		else if ((frameNo % 3)) averiVx = approach_zero(averiVx, 1); // Slow down cause we're not trying to go anywhere
 		
-		if (averi_airborne) // If in the air, enact gravity
+		if (averi_airborne) // If in the air, enact gravity onto velocity
 			averiVy += (keySPACEdown(k)? 1: 3); // (3x faster if space is released)
 		else if (keySPACEdown(k) && !keySPACEdown(k_held)) // Otherwise, jumping is possible
 			averiVy = -20;
 		
 		// Apply velocity -------------------------------------------------------------------------------------------------------------
-		
+		//printf("x %i, vx %i, y %i, vy %i, airborne %b", averiX, averiVx, averiY, averiVy, averi_airborne);
 		// Collision check with every cr
 		for (int i = 0; i < *crlen; i++) {
 			struct coll_rect cr = crs[i]; // For each collision rectangle,
-			if (averiVyColl(cr)) { // If Averi's Y velocity would result in collision:
+			if (averiVyColl(cr)) { // If Averi's Y velocity alone would result in collision:
 				// Reduce Vy accordingly
 				if (averiVy > 0) {
 					int potential_new_vy = cr.y - (averiY+averiH);
@@ -171,7 +173,7 @@ static void averi_tick(unsigned short k, unsigned short k_held, struct coll_rect
 						averiVy = potential_new_vy;
 				}
 			}
-			if (averiVxyColl(cr)) { // If, after accounting for Y alone, her remaining velocity would result in collision:
+			if (averiVxColl(cr)) { // If her X velocity alone would result in collision:
 				// Reduce Vx accordingly
 				if (averiVx > 0) {
 					int potential_new_vx = cr.x - (averiX+averiW);
@@ -182,15 +184,15 @@ static void averi_tick(unsigned short k, unsigned short k_held, struct coll_rect
 					if (potential_new_vx > averiVx)
 						averiVx = potential_new_vx;
 				}
-				
 				// LEDGE GRAB CHECK
-				struct coll_rect ledge_cr = {averiX-averiW, cr.y-27, averiW*2, averiH};
+				struct coll_rect ledge_cr = {(averiX+averiVx)-averiW, cr.y-27, averiW*2, averiH};
 				if ( (cr.y>averiY) && // The ledge is below the top of averi's head
 					 averi_airborne &&
 					 (averiVy >= 0) && // She's not still going up (since that may suffice to clear the obstacle without a grab, and the grab then would annoy the player)
 					 !any_collides(ledge_cr, crs, *crlen)
 					 && !keySdown(k) )
 				{
+					//printf("\nLedge grab initiates, x %i, vx %i, y %i, vy %i, airborne %b", averiX, averiVx, averiY, averiVy, averi_airborne);
 					// Ensure she's facing properly for the ledge grab state
 					averiRightFace = (cr.x > averiX);
 					// Enter the ledge grab state
@@ -201,24 +203,27 @@ static void averi_tick(unsigned short k, unsigned short k_held, struct coll_rect
 					averiVx = 0;
 				}
 			}
+			if (averiVxyColl(cr)) { // If, after accounting for each axis alone, her remaining velocity would result in collision:
+				// Reduce Vy however much is needed until its resolved
+				if (averiVy > 0) {
+					int potential_new_vy = cr.y - (averiY+averiH);
+					if (potential_new_vy < averiVy)
+						averiVy = potential_new_vy;
+				} else if (averiVy < 0) {
+					int potential_new_vy = (cr.y+cr.h) - averiY;
+					if (potential_new_vy > averiVy)
+						averiVy = potential_new_vy;
+				}
+			}
 		}
-		
-		/*
-		// If she's still in collision after all the velocity reductions by collision checks (i.e. stuck inside a solid object)...
-		struct coll_rect averi_cr = { .x=averiX-averiW, .y=averiY, .w=averiW*2, .h=averiH };
-		while (any_collides(averi_cr, crs, *crlen)) {
-			averiY--;
-			averi_cr = (struct coll_rect) { .x=averiX-averiW, .y=averiY, .w=averiW*2, .h=averiH };
-			averiVx = averiVy = 0;
-		}
-		*/
+		//printf(" POST COLLISION CHECK: x %i, vx %i, y %i, vy %i, airborne %b\n", averiX, averiVx, averiY, averiVy, averi_airborne);
 		
 		// Enact velocity onto position
 		averiX += averiVx;
 		animDX += averiVx;
 		averiY += averiVy; // Fall
 		
-		// Determine if she's airborne or standing on a precipice
+		// Determine if she's standing on anything
 		averi_airborne = true; // Unless we find her to be standing on something, assume she's in the air
 		for (int i = 0; i < *crlen; i++) { // Now check every collision rectangle...
 			struct coll_rect cr = crs[i];
