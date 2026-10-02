@@ -27,6 +27,8 @@ void si_start(char* sprite_sheet) {
 	//SetExitKey(KEY_NULL); // Disable the default escape-key closing the window action
 	
     spriteTexture = LoadTexture(sprite_sheet); //global Texture2D from LoadTexture("path to .png")
+		
+	SetTextureFilter(spriteTexture, TEXTURE_FILTER_POINT); // This fixed the atlas bleeding I used to see above averi's head at certain window sizes
 	
     SetTargetFPS(30);
 }
