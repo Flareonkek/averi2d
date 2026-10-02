@@ -18,7 +18,7 @@ int main(void) {
 	struct r rs[5000]; // Array of struct r (things to render on screen)
 	int rslen = 0; // How many need to be rendered currently
 	
-	si_start("resource/gameveri_sheet_1001.png");
+	si_start("resource/gameveri_sheet_1002.png");
 	
 	int state = MAIN_MENU;
 	
