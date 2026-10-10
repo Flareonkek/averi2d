@@ -7,18 +7,20 @@ See https://www.raylib.com/ for details.
 TO INSTALL
 
 After putting all these files on your computer
-(In the terminal enter: git clone [The URL from the green "Code" button in the top right of the github page] ),
-there are 2 extra little steps you have to do to get it to work.
+(In the terminal enter: git clone [The URL from the green "Code" button in the top right of the github page] OR
+download the .ziip from the same green button, and extract it wherever you want to keep the game files),
+then there are 2 extra little steps you have to do to get it to work:
 
+First:
 Give compile.sh permission to execute, right-click it, hit "Properties" and check a box for that.
 (Or you can enter chmod +x compile.sh in the terminal, that does the same thing)
 
-Install all these prerequisites for raylib to work (You only gotta do this once if you haven't already)
-By entering this in the terminal (On other rare/weird linux versions it may be some different command, but it'll be the same stuff you're ultimately trying to install.)
-sudo apt install libasound2-dev libx11-dev libxrandr-dev libxi-dev libgl1-mesa-dev libglu1-mesa-dev libxcursor-dev libxinerama-dev libwayland-dev libxkbcommon-dev
-
-Now just run
+Second, just run:
 ./compile.sh
 which will create an executable file "main", which you can run by entering
 ./main
 And the game should start up in a new window.
+
+(Note: the compile script will ask you for your password in order to install raylib's dependencies:
+libasound2-dev libx11-dev libxrandr-dev libxi-dev libgl1-mesa-dev libglu1-mesa-dev libxcursor-dev libxinerama-dev libwayland-dev libxkbcommon-dev,
+and also to install gcc in case you don't have it. If you can't use apt for some reason, rewrite that part yourself.)
